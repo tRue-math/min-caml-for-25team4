@@ -177,3 +177,40 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) 
                 (fun z -> Put(x, y, z), Type.Unit)))
 
 let f e = fst (g M.empty e)
+
+
+let rec print_expr oc (e : t) =
+  let rec to_string e = match e with
+    | Unit -> "()"
+    | Int(i) -> Printf.sprintf "INT %d" i
+    | Float(d) -> Printf.sprintf "FLOAT %f" d
+    | Neg(e) -> Printf.sprintf "-%s" e
+    | Add(e1, e2) -> Printf.sprintf "%s + %s" e1 e2
+    | Sub(e1, e2) -> Printf.sprintf "%s - %s" e1 e2
+    | FNeg(e) -> Printf.sprintf "-%s" e
+    | FAdd(e1, e2) -> Printf.sprintf "%s +. %s" e1 e2
+    | FSub(e1, e2) -> Printf.sprintf "%s -. %s" e1 e2
+    | FMul(e1, e2) -> Printf.sprintf "%s *. %s" e1 e2
+    | FDiv(e1, e2) -> Printf.sprintf "%s /. %s" e1 e2
+    | IfEq(e1, e2, e3, e4) -> Printf.sprintf "%s == %s ? %s : %s" e1 e2 (to_string e3) (to_string e4)
+    | IfLE(e1, e2, e3, e4) -> Printf.sprintf "%s <= %s ? %s : %s" e1 e2 (to_string e3) (to_string e4)
+    | Let((x, _), e1, e2) -> Printf.sprintf "LET %s = %s\nin\n%s" x (to_string e1) (to_string e2)
+    | Var(x) -> Printf.sprintf "VAR %s" x
+    | LetRec({ name = (x, _); args = yts; body = e1 }, e2) ->
+        let args_str = String.concat ", " (List.map (fun (y, _) -> y) yts) in
+        Printf.sprintf "LETREC %s [%s] = %s\nin\n%s" x args_str (to_string e1) (to_string e2)
+    | App(e, es) ->
+        let es_str = String.concat ", " es in
+        Printf.sprintf "APP(%s, [%s])" e es_str
+    | Tuple(es) ->
+        let es_str = String.concat ", " es in
+        Printf.sprintf "Tuple([%s])" es_str
+    | LetTuple(xts, e1, e2) ->
+        let xts_str = String.concat ", " (List.map (fun (x, _) -> Printf.sprintf "(%s, %s)" x "TypeVar") xts) in
+        Printf.sprintf "LetTuple([%s], %s, %s)" xts_str e1 (to_string e2)
+    | Get(e1, e2) -> Printf.sprintf "Get(%s, %s)" e1 e2
+    | Put(e1, e2, e3) -> Printf.sprintf "Put(%s, %s, %s)" e1 e2 e3
+    | ExtArray(e1) -> Printf.sprintf "ExtArray %s" e1
+    | ExtFunApp(f, es) -> Printf.sprintf "ExtFunApp(%s, [%s])" f (String.concat ", " es)
+  in
+  Printf.fprintf oc "%s\n" (to_string e)
