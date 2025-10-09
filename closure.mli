@@ -1,5 +1,6 @@
 type closure = { entry : Id.l; actual_fv : Id.t list }
-type t =
+type t = {v: node; pos: Lexing.position}
+and node =
   | Unit
   | Int of int
   | Float of float

@@ -2,6 +2,8 @@
 (* parserが利用する変数、関数、型などの定義 *)
 open Syntax
 let addtyp x = (x, Type.gentyp ())
+
+let at_pos node = { v = node; pos = Parsing.symbol_start_pos () }
 %}
 
 /* (* 字句を表すデータ型の定義 (caml2html: parser_token) *) */
@@ -62,85 +64,90 @@ simple_exp: /* (* 括弧をつけなくても関数の引数になれる式 (cam
 | LPAREN exp RPAREN
     { $2 }
 | LPAREN RPAREN
-    { Unit }
+    { at_pos Unit }
 | BOOL
-    { Bool($1) }
+    { at_pos (Bool($1)) }
 | INT
-    { Int($1) }
+    { at_pos (Int($1)) }
 | FLOAT
-    { Float($1) }
+    { at_pos (Float($1)) }
 | IDENT
-    { Var($1) }
+    { at_pos (Var($1)) }
 | simple_exp DOT LPAREN exp RPAREN
-    { Get($1, $4) }
+    { at_pos (Get($1, $4)) }
 
 exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 | simple_exp
     { $1 }
 | NOT exp
     %prec prec_app
-    { Not($2) }
+    { at_pos (Not($2)) }
 | MINUS exp
     %prec prec_unary_minus
     { match $2 with
-    | Float(f) -> Float(-.f) (* -1.23などは型エラーではないので別扱い *)
-    | e -> Neg(e) }
+    | {v=Float(f);pos} -> {v=Float(-.f);pos} (* -1.23などは型エラーではないので別扱い *)
+    | {v=_;pos} as e -> {v=Neg(e);pos} }
 | exp PLUS exp /* (* 足し算を構文解析するルール (caml2html: parser_add) *) */
-    { Add($1, $3) }
+    { at_pos (Add($1, $3)) }
 | exp MINUS exp
-    { Sub($1, $3) }
+    { at_pos (Sub($1, $3)) }
 | exp EQUAL exp
-    { Eq($1, $3) }
+    { at_pos (Eq($1, $3)) }
 | exp LESS_GREATER exp
-    { Not(Eq($1, $3)) (* some float comparisons differ from OCaml for NaN; see: https://github.com/esumii/min-caml/issues/13#issuecomment-1147032750 *) }
+    { at_pos (Not(at_pos (Eq($1, $3)))) 
+    (* some float comparisons differ from OCaml for NaN; see: https://github.com/esumii/min-caml/issues/13#issuecomment-1147032750 *) }
 | exp LESS exp
-    { Not(LE($3, $1)) }
+    { at_pos (Not(at_pos (LE($3, $1)))) }
 | exp GREATER exp
-    { Not(LE($1, $3)) }
+    { at_pos (Not(at_pos (LE($1, $3)))) }
 | exp LESS_EQUAL exp
-    { LE($1, $3) }
+    { at_pos (LE($1, $3)) }
 | exp GREATER_EQUAL exp
-    { LE($3, $1) }
+    { at_pos (LE($3, $1)) }
 | IF exp THEN exp ELSE exp
     %prec prec_if
-    { If($2, $4, $6) }
+    { at_pos (If($2, $4, $6)) }
 | MINUS_DOT exp
     %prec prec_unary_minus
-    { FNeg($2) }
+    { at_pos (FNeg($2)) }
 | exp PLUS_DOT exp
-    { FAdd($1, $3) }
+    { at_pos (FAdd($1, $3)) }
 | exp MINUS_DOT exp
-    { FSub($1, $3) }
+    { at_pos (FSub($1, $3)) }
 | exp AST_DOT exp
-    { FMul($1, $3) }
+    { at_pos (FMul($1, $3)) }
 | exp SLASH_DOT exp
-    { FDiv($1, $3) }
+    { at_pos (FDiv($1, $3)) }
 | LET IDENT EQUAL exp IN exp
     %prec prec_let
-    { Let(addtyp $2, $4, $6) }
+    { at_pos (Let(addtyp $2, $4, $6)) }
 | LET REC fundef IN exp
     %prec prec_let
-    { LetRec($3, $5) }
+    { at_pos (LetRec($3, $5)) }
 | simple_exp actual_args
     %prec prec_app
-    { App($1, $2) }
+    { at_pos (App($1, $2)) }
 | elems
     %prec prec_tuple
-    { Tuple($1) }
+    { at_pos (Tuple($1)) }
 | LET LPAREN pat RPAREN EQUAL exp IN exp
-    { LetTuple($3, $6, $8) }
+    { at_pos (LetTuple($3, $6, $8)) }
 | simple_exp DOT LPAREN exp RPAREN LESS_MINUS exp
-    { Put($1, $4, $7) }
+    { at_pos (Put($1, $4, $7)) }
 | exp SEMICOLON exp
-    { Let((Id.gentmp Type.Unit, Type.Unit), $1, $3) }
+    { at_pos (Let((Id.gentmp Type.Unit, Type.Unit), $1, $3)) }
 | ARRAY_CREATE simple_exp simple_exp
     %prec prec_app
-    { Array($2, $3) }
+    { at_pos (Array($2, $3)) }
 | error
-    { failwith
-        (Printf.sprintf "parse error near characters %d-%d"
-           (Parsing.symbol_start ())
-           (Parsing.symbol_end ())) }
+    { let sp = Parsing.symbol_start_pos () in
+      let ep = Parsing.symbol_end_pos ()
+      in
+      failwith
+        (Printf.sprintf "parse error line %d, near characters %d-%d"
+           sp.Lexing.pos_lnum
+           (sp.Lexing.pos_cnum - sp.Lexing.pos_bol + 1)
+           (ep.Lexing.pos_cnum - ep.Lexing.pos_bol)) }
 
 fundef:
 | IDENT formal_args EQUAL exp

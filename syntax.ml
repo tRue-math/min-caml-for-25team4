@@ -1,4 +1,6 @@
-type t = (* MinCamlの構文を表現するデータ型 (caml2html: syntax_t) *)
+(* MinCamlの構文を表現するデータ型 (caml2html: syntax_t) *)
+type t = {v: node;pos: Lexing.position}
+and node =
   | Unit
   | Bool of bool
   | Int of int
@@ -26,8 +28,8 @@ type t = (* MinCamlの構文を表現するデータ型 (caml2html: syntax_t) *)
   | Put of t * t * t
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
-let rec print_expr oc (e : t) =
-  let rec to_string e = match e with
+let print_expr oc (e : t) =
+  let rec to_string {v=e;_} = match e with
     | Unit -> "()"
     | Bool(b) -> Printf.sprintf "BOOL %b" b
     | Int(i) -> Printf.sprintf "INT %d" i
