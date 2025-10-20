@@ -185,37 +185,54 @@ let f e = fst (g M.empty e)
 
 
 let print_expr oc (e : t) =
-  let rec to_string {v=e;_} = match e with
-    | Unit -> "()"
-    | Int(i) -> Printf.sprintf "INT %d" i
-    | Float(d) -> Printf.sprintf "FLOAT %f" d
-    | Neg(e) -> Printf.sprintf "-%s" e
-    | Add(e1, e2) -> Printf.sprintf "%s + %s" e1 e2
-    | Sub(e1, e2) -> Printf.sprintf "%s - %s" e1 e2
-    | FNeg(e) -> Printf.sprintf "-%s" e
-    | FAdd(e1, e2) -> Printf.sprintf "%s +. %s" e1 e2
-    | FSub(e1, e2) -> Printf.sprintf "%s -. %s" e1 e2
-    | FMul(e1, e2) -> Printf.sprintf "%s *. %s" e1 e2
-    | FDiv(e1, e2) -> Printf.sprintf "%s /. %s" e1 e2
-    | IfEq(e1, e2, e3, e4) -> Printf.sprintf "%s == %s ? %s : %s" e1 e2 (to_string e3) (to_string e4)
-    | IfLE(e1, e2, e3, e4) -> Printf.sprintf "%s <= %s ? %s : %s" e1 e2 (to_string e3) (to_string e4)
-    | Let((x, _), e1, e2) -> Printf.sprintf "LET %s = %s\nin\n%s" x (to_string e1) (to_string e2)
-    | Var(x) -> Printf.sprintf "VAR %s" x
+  let make_indent level = String.make (level) ' ' in
+  let rec to_string {v=e;_} level =
+    let indent = make_indent level in let nlev = level+1 in match e with
+    | Unit -> indent ^ "()"
+    | Int(i) -> Printf.sprintf "%sINT %d" indent i
+    | Float(d) -> Printf.sprintf "%sFLOAT %f" indent d
+    | Neg(e) -> Printf.sprintf "%s-%s" indent e
+    | Add(e1, e2) -> Printf.sprintf "%s(%s + %s)" indent e1 e2
+    | Sub(e1, e2) -> Printf.sprintf "%s(%s - %s)" indent e1 e2
+    | FNeg(e) -> Printf.sprintf "%s-.%s" indent e
+    | FAdd(e1, e2) -> Printf.sprintf "%s(%s +. %s)" indent e1 e2
+    | FSub(e1, e2) -> Printf.sprintf "%s(%s -. %s)" indent e1 e2
+    | FMul(e1, e2) -> Printf.sprintf "%s(%s *. %s)" indent e1 e2
+    | FDiv(e1, e2) -> Printf.sprintf "%s(%s /. %s)" indent e1 e2
+    | IfEq(e1, e2, e3, e4) -> Printf.sprintf "%s(%s == %s ?\n%s :\n%s)"
+                      indent e1 e2
+                      (to_string e3 nlev) (to_string e4 nlev)
+    | IfLE(e1, e2, e3, e4) -> Printf.sprintf "%s(%s <= %s ?\n%s :\n%s)"
+                      indent e1 e2
+                      (to_string e3 nlev) (to_string e4 nlev)
+    | Let((x, _), e1, e2) -> Printf.sprintf "%s(LET %s = {\n%s\n%s} in\n%s\n%s)"
+                      indent x
+                      (to_string e1 (level+2))
+                      (make_indent nlev) (to_string e2 nlev)
+                      indent
+    | Var(x) -> Printf.sprintf "%sVAR %s" indent x
     | LetRec({ name = (x, _); args = yts; body = e1 }, e2) ->
         let args_str = String.concat ", " (List.map (fun (y, _) -> y) yts) in
-        Printf.sprintf "LETREC %s [%s] = %s\nin\n%s" x args_str (to_string e1) (to_string e2)
+        Printf.sprintf "%s(LETREC %s [%s] = {\n%s\n%s} in\n%s\n%s)"
+                      indent x args_str
+                      (to_string e1 (level+2))
+                      (make_indent nlev) (to_string e2 nlev)
+                      indent
     | App(e, es) ->
         let es_str = String.concat ", " es in
-        Printf.sprintf "APP(%s, [%s])" e es_str
+        Printf.sprintf "%sAPP(%s [%s])" indent e es_str
     | Tuple(es) ->
         let es_str = String.concat ", " es in
-        Printf.sprintf "Tuple([%s])" es_str
+        Printf.sprintf "%sTUPLE([%s])" indent es_str
     | LetTuple(xts, e1, e2) ->
-        let xts_str = String.concat ", " (List.map (fun (x, _) -> Printf.sprintf "(%s, %s)" x "TypeVar") xts) in
-        Printf.sprintf "LetTuple([%s], %s, %s)" xts_str e1 (to_string e2)
-    | Get(e1, e2) -> Printf.sprintf "Get(%s, %s)" e1 e2
-    | Put(e1, e2, e3) -> Printf.sprintf "Put(%s, %s, %s)" e1 e2 e3
-    | ExtArray(e1) -> Printf.sprintf "ExtArray %s" e1
-    | ExtFunApp(f, es) -> Printf.sprintf "ExtFunApp(%s, [%s])" f (String.concat ", " es)
+        let xts_str = String.concat ", " (List.map (fun (x, _) -> x) xts) in
+        Printf.sprintf "%s(LETTUPLE [%s] = %s in\n%s\n%s)"
+                      indent xts_str e1
+                      (to_string e2 nlev)
+                      indent
+    | Get(e1, e2) -> Printf.sprintf "%sGET(%s, %s)" indent e1 e2
+    | Put(e1, e2, e3) -> Printf.sprintf "%sPUT(%s, %s, %s)" indent  e1 e2 e3
+    | ExtArray(e1) -> Printf.sprintf "%sEXTARRAY %s" indent e1
+    | ExtFunApp(f, es) -> Printf.sprintf "%sEXTFUNAPP(%s [%s])" indent f (String.concat ", " es)
   in
-  Printf.fprintf oc "%s\n" (to_string e)
+  Printf.fprintf oc "%s\n" (to_string e 0)
