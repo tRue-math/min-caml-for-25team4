@@ -1,4 +1,5 @@
-type t =
+type t = {v: node; pos: Lexing.position}
+and node =
   | Unit
   | Int of int
   | Float of float
@@ -26,3 +27,5 @@ and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 val fv : t -> S.t
 val f : Syntax.t -> t
+
+val print_expr : out_channel -> t -> unit

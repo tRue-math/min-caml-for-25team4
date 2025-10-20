@@ -1,5 +1,6 @@
 type id_or_imm = V of Id.t | C of int
-type t =
+type t = { v: node; pos: Lexing.position }
+and node =
   | Ans of exp
   | Let of (Id.t * Type.t) * exp * t
 and exp =

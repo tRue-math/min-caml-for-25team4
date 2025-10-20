@@ -1,5 +1,6 @@
 type closure = { entry : Id.l; actual_fv : Id.t list }
-type t = (* クロージャ変換後の式 (caml2html: closure_t) *)
+type t = {v: node; pos: Lexing.position}(* クロージャ変換後の式 (caml2html: closure_t) *)
+and node =
   | Unit
   | Int of int
   | Float of float
@@ -29,7 +30,7 @@ type fundef = { name : Id.l * Type.t;
                 body : t }
 type prog = Prog of fundef list * t
 
-let rec fv = function
+let rec fv {v=e;_} = match e with
   | Unit | Int(_) | Float(_) | ExtArray(_) -> S.empty
   | Neg(x) | FNeg(x) -> S.singleton x
   | Add(x, y) | Sub(x, y) | FAdd(x, y) | FSub(x, y) | FMul(x, y) | FDiv(x, y) | Get(x, y) -> S.of_list [x; y]
@@ -44,22 +45,23 @@ let rec fv = function
 
 let toplevel : fundef list ref = ref []
 
-let rec g env known = function (* クロージャ変換ルーチン本体 (caml2html: closure_g) *)
-  | KNormal.Unit -> Unit
-  | KNormal.Int(i) -> Int(i)
-  | KNormal.Float(d) -> Float(d)
-  | KNormal.Neg(x) -> Neg(x)
-  | KNormal.Add(x, y) -> Add(x, y)
-  | KNormal.Sub(x, y) -> Sub(x, y)
-  | KNormal.FNeg(x) -> FNeg(x)
-  | KNormal.FAdd(x, y) -> FAdd(x, y)
-  | KNormal.FSub(x, y) -> FSub(x, y)
-  | KNormal.FMul(x, y) -> FMul(x, y)
-  | KNormal.FDiv(x, y) -> FDiv(x, y)
-  | KNormal.IfEq(x, y, e1, e2) -> IfEq(x, y, g env known e1, g env known e2)
-  | KNormal.IfLE(x, y, e1, e2) -> IfLE(x, y, g env known e1, g env known e2)
-  | KNormal.Let((x, t), e1, e2) -> Let((x, t), g env known e1, g (M.add x t env) known e2)
-  | KNormal.Var(x) -> Var(x)
+let rec g env known ({v=e;pos}:KNormal.t) = (* クロージャ変換ルーチン本体 (caml2html: closure_g) *)
+  let set_pos e = {v=e;pos} in match e with
+  | KNormal.Unit -> set_pos Unit
+  | KNormal.Int(i) -> set_pos (Int(i))
+  | KNormal.Float(d) -> set_pos (Float(d))
+  | KNormal.Neg(x) -> set_pos (Neg(x))
+  | KNormal.Add(x, y) -> set_pos (Add(x, y))
+  | KNormal.Sub(x, y) -> set_pos (Sub(x, y))
+  | KNormal.FNeg(x) -> set_pos (FNeg(x))
+  | KNormal.FAdd(x, y) -> set_pos (FAdd(x, y))
+  | KNormal.FSub(x, y) -> set_pos (FSub(x, y))
+  | KNormal.FMul(x, y) -> set_pos (FMul(x, y))
+  | KNormal.FDiv(x, y) -> set_pos (FDiv(x, y))
+  | KNormal.IfEq(x, y, e1, e2) -> set_pos (IfEq(x, y, g env known e1, g env known e2))
+  | KNormal.IfLE(x, y, e1, e2) -> set_pos (IfLE(x, y, g env known e1, g env known e2))
+  | KNormal.Let((x, t), e1, e2) -> set_pos (Let((x, t), g env known e1, g (M.add x t env) known e2))
+  | KNormal.Var(x) -> set_pos (Var(x))
   | KNormal.LetRec({ KNormal.name = (x, t); KNormal.args = yts; KNormal.body = e1 }, e2) -> (* 関数定義の場合 (caml2html: closure_letrec) *)
       (* 関数定義let rec x y1 ... yn = e1 in e2の場合は、
          xに自由変数がない(closureを介さずdirectに呼び出せる)
@@ -85,20 +87,20 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2
       toplevel := { name = (Id.L(x), t); args = yts; formal_fv = zts; body = e1' } :: !toplevel; (* トップレベル関数を追加 *)
       let e2' = g env' known' e2 in
       if S.mem x (fv e2') then (* xが変数としてe2'に出現するか *)
-        MakeCls((x, t), { entry = Id.L(x); actual_fv = zs }, e2') (* 出現していたら削除しない *)
+        set_pos (MakeCls((x, t), { entry = Id.L(x); actual_fv = zs }, e2')) (* 出現していたら削除しない *)
       else
         (Format.eprintf "eliminating closure(s) %s@." x;
          e2') (* 出現しなければMakeClsを削除 *)
   | KNormal.App(x, ys) when S.mem x known -> (* 関数適用の場合 (caml2html: closure_app) *)
       Format.eprintf "directly applying %s@." x;
-      AppDir(Id.L(x), ys)
-  | KNormal.App(f, xs) -> AppCls(f, xs)
-  | KNormal.Tuple(xs) -> Tuple(xs)
-  | KNormal.LetTuple(xts, y, e) -> LetTuple(xts, y, g (M.add_list xts env) known e)
-  | KNormal.Get(x, y) -> Get(x, y)
-  | KNormal.Put(x, y, z) -> Put(x, y, z)
-  | KNormal.ExtArray(x) -> ExtArray(Id.L(x))
-  | KNormal.ExtFunApp(x, ys) -> AppDir(Id.L("min_caml_" ^ x), ys)
+      set_pos (AppDir(Id.L(x), ys))
+  | KNormal.App(f, xs) -> set_pos (AppCls(f, xs))
+  | KNormal.Tuple(xs) -> set_pos (Tuple(xs))
+  | KNormal.LetTuple(xts, y, e) -> set_pos (LetTuple(xts, y, g (M.add_list xts env) known e))
+  | KNormal.Get(x, y) -> set_pos (Get(x, y))
+  | KNormal.Put(x, y, z) -> set_pos (Put(x, y, z))
+  | KNormal.ExtArray(x) -> set_pos (ExtArray(Id.L(x)))
+  | KNormal.ExtFunApp(x, ys) -> set_pos (AppDir(Id.L("min_caml_" ^ x), ys))
 
 let f e =
   toplevel := [];
