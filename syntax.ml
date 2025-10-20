@@ -29,39 +29,74 @@ and node =
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 let print_expr oc (e : t) =
-  let rec to_string {v=e;_} = match e with
-    | Unit -> "()"
-    | Bool(b) -> Printf.sprintf "BOOL %b" b
-    | Int(i) -> Printf.sprintf "INT %d" i
-    | Float(d) -> Printf.sprintf "FLOAT %f" d
-    | Not(e) -> Printf.sprintf "NOT %s" (to_string e)
-    | Neg(e) -> Printf.sprintf "NEG %s" (to_string e)
-    | Add(e1, e2) -> Printf.sprintf "ADD(%s, %s)" (to_string e1) (to_string e2)
-    | Sub(e1, e2) -> Printf.sprintf "SUB(%s, %s)" (to_string e1) (to_string e2)
-    | FNeg(e) -> Printf.sprintf "FNEG %s" (to_string e)
-    | FAdd(e1, e2) -> Printf.sprintf "FADD(%s, %s)" (to_string e1) (to_string e2)
-    | FSub(e1, e2) -> Printf.sprintf "FSUB(%s, %s)" (to_string e1) (to_string e2)
-    | FMul(e1, e2) -> Printf.sprintf "FMUL(%s, %s)" (to_string e1) (to_string e2)
-    | FDiv(e1, e2) -> Printf.sprintf "FDIV(%s, %s)" (to_string e1) (to_string e2)
-    | Eq(e1, e2) -> Printf.sprintf "EQ(%s, %s)" (to_string e1) (to_string e2)
-    | LE(e1, e2) -> Printf.sprintf "LE(%s, %s)" (to_string e1) (to_string e2)
-    | If(e1, e2, e3) -> Printf.sprintf "IF(\n%s\n%s\n%s\n)" (to_string e1) (to_string e2) (to_string e3)
-    | Let((x, _), e1, e2) -> Printf.sprintf "LET(\n%s\n%s\n%s)" x (to_string e1) (to_string e2)
-    | Var(x) -> Printf.sprintf "VAR %s" x
+  let make_indent level = String.make (level) ' ' in
+  let rec to_string {v=e;_} level =
+    let indent = make_indent level in let nlev = level+1 in match e with
+    | Unit -> indent ^ "()"
+    | Bool(b) -> Printf.sprintf "%sBOOL %b" indent b
+    | Int(i) -> Printf.sprintf "%sINT %d" indent i
+    | Float(d) -> Printf.sprintf "%sFLOAT %f" indent d
+    | Not(e) -> Printf.sprintf "%sNOT\n%s" indent (to_string e nlev)
+    | Neg(e) -> Printf.sprintf "%sNEG\n%s" indent (to_string e nlev)
+    | Add(e1, e2) -> Printf.sprintf "%sADD(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | Sub(e1, e2) -> Printf.sprintf "%sSUB(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | FNeg(e) -> Printf.sprintf "%sFNEG\n%s" indent (to_string e nlev)
+    | FAdd(e1, e2) -> Printf.sprintf "%sFADD(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | FSub(e1, e2) -> Printf.sprintf "%sFSUB(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | FMul(e1, e2) -> Printf.sprintf "%sFMUL(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | FDiv(e1, e2) -> Printf.sprintf "%sFDIV(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | Eq(e1, e2) -> Printf.sprintf "%sEQ(\n%s,\n%s\n%s)" 
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | LE(e1, e2) -> Printf.sprintf "%sLE(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | If(e1, e2, e3) -> Printf.sprintf "%sIF(\n%s\n%s\n%s\n%s)"
+                    indent
+                    (to_string e1 nlev) (to_string e2 nlev) (to_string e3 nlev)
+                    indent
+    | Let((x, _), e1, e2) -> Printf.sprintf "%sLET(\n%s\n%s\n%s\n%s)"
+                    indent
+                    (make_indent nlev ^ x) (to_string e1 nlev) (to_string e2 nlev)
+                    indent
+    | Var(x) -> Printf.sprintf "%sVAR %s" indent x
     | LetRec({ name = (x, _); args = yts; body = e1 }, e2) ->
         let args_str = String.concat ", " (List.map (fun (y, _) -> y) yts) in
-        Printf.sprintf "LETREC(FUN:{\n%s [%s] = %s}\n%s)" x args_str (to_string e1) (to_string e2)
+        Printf.sprintf "%sLETREC(\n%s%s [%s] = {\n%s\n%s}\n%s\n%s)"
+                    indent
+                    (make_indent nlev) x args_str
+                    (to_string e1 (level+2))
+                    (make_indent nlev)
+                    (to_string e2 nlev)
+                    indent
     | App(e, es) ->
-        let es_str = String.concat ", " (List.map to_string es) in
-        Printf.sprintf "APP(%s, [%s])" (to_string e) es_str
+        let es_str = String.concat ",\n" 
+            (List.map (fun e -> to_string e (level+2)) es) in
+        Printf.sprintf "%sAPP(\n%s [\n%s\n%s]\n%s)"
+                    indent (to_string e nlev)
+                    es_str (make_indent nlev) indent
     | Tuple(es) ->
-        let es_str = String.concat ", " (List.map to_string es) in
-        Printf.sprintf "Tuple([%s])" es_str
+        let es_str = String.concat ",\n"
+            (List.map (fun e -> to_string e nlev) es) in
+        Printf.sprintf "%sTuple([\n%s\n%s])" indent es_str indent
     | LetTuple(xts, e1, e2) ->
-        let xts_str = String.concat ", " (List.map (fun (x, _) -> Printf.sprintf "(%s, %s)" x "TypeVar") xts) in
-        Printf.sprintf "LetTuple([%s], %s, %s)" xts_str (to_string e1) (to_string e2)
-    | Array(e1, e2) -> Printf.sprintf "Array(%s, %s)" (to_string e1) (to_string e2)
-    | Get(e1, e2) -> Printf.sprintf "Get(%s, %s)" (to_string e1) (to_string e2)
-    | Put(e1, e2, e3) -> Printf.sprintf "Put(%s, %s, %s)" (to_string e1) (to_string e2) (to_string e3)
+        let xts_str = String.concat ", " (List.map (fun (x, _) -> x) xts) in
+        Printf.sprintf "%sLetTuple(\n%s[%s],\n%s,\n%s\n%s)"
+                    indent
+                    (make_indent nlev) xts_str
+                    (to_string e1 nlev) (to_string e2 nlev)
+                    indent
+    | Array(e1, e2) -> Printf.sprintf "%sArray(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | Get(e1, e2) -> Printf.sprintf "%sGet(\n%s,\n%s\n%s)"
+                    indent (to_string e1 nlev) (to_string e2 nlev) indent
+    | Put(e1, e2, e3) -> Printf.sprintf "%sPut(\n%s,\n%s,\n%s\n%s)"
+                    indent
+                    (to_string e1 nlev) (to_string e2 nlev) (to_string e3 nlev)
+                    indent
   in
-  Printf.fprintf oc "%s\n" (to_string e)
+  Printf.fprintf oc "%s\n" (to_string e 0)
