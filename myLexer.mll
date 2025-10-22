@@ -5,7 +5,7 @@ open Type
 }
 
 (* 正規表現の略記 *)
-let new_line = ['\n' '\r']
+let new_line = "\r\n" | ['\n' '\r']
 let space = [' ' '\t']
 let digit = ['0'-'9']
 let lower = ['a'-'z']
