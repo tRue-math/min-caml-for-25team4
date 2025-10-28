@@ -17,6 +17,11 @@
  (enabled_if (= %{profile} ppc))
  (alias to_ppc))
 
+(copy_files
+ (files myISA/*)
+ (enabled_if (= %{profile} myISA))
+ (alias to_myISA))
+
 (env
  (dev
   (flags (:standard -warn-error -a))))
