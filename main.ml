@@ -19,12 +19,13 @@ let lexbuf f outchan l = (* バッファをコンパイルしてチャンネル�
   Debug.print_debug (f ^ ".after_CSE") KNormal.print_expr cse;
   let alpha = Alpha.f knormal in
   Debug.print_debug (f ^ ".alpha") KNormal.print_expr alpha;
+  let optimized = iter !limit alpha in
+  Debug.print_debug (f ^ ".optimized") KNormal.print_expr optimized;
   Emit.f outchan
     (RegAlloc.f
        (Simm.f
           (Virtual.f
-             (Closure.f
-                (iter !limit alpha)))))
+             (Closure.f optimized))))
 
 let string s = lexbuf "tmp" stdout (Lexing.from_string s) (* 文字列をコンパイルして標準出力に表示する (caml2html: main_string) *)
 
