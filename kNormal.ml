@@ -185,7 +185,7 @@ let f e = fst (g M.empty e)
 
 
 let print_expr oc (e : t) =
-  let make_indent level = String.make (level) ' ' in
+  let make_indent level = String.make (level) '\t' in
   let rec to_string {v=e;_} level =
     let indent = make_indent level in let nlev = level+1 in match e with
     | Unit -> indent ^ "()"
@@ -205,19 +205,17 @@ let print_expr oc (e : t) =
     | IfLE(e1, e2, e3, e4) -> Printf.sprintf "%s(%s <= %s ?\n%s :\n%s)"
                       indent e1 e2
                       (to_string e3 nlev) (to_string e4 nlev)
-    | Let((x, _), e1, e2) -> Printf.sprintf "%s(LET %s = {\n%s\n%s} in\n%s\n%s)"
+    | Let((x, _), e1, e2) -> Printf.sprintf "%slet %s =\n%s\n%sin\n%s"
                       indent x
-                      (to_string e1 (level+2))
-                      (make_indent nlev) (to_string e2 nlev)
-                      indent
+                      (to_string e1 nlev)
+                      indent (to_string e2 level)
     | Var(x) -> Printf.sprintf "%sVAR %s" indent x
     | LetRec({ name = (x, _); args = yts; body = e1 }, e2) ->
         let args_str = String.concat ", " (List.map (fun (y, _) -> y) yts) in
-        Printf.sprintf "%s(LETREC %s [%s] = {\n%s\n%s} in\n%s\n%s)"
+        Printf.sprintf "%slet rec %s [%s] =\n%s\n%sin\n%s"
                       indent x args_str
-                      (to_string e1 (level+2))
-                      (make_indent nlev) (to_string e2 nlev)
-                      indent
+                      (to_string e1 nlev)
+                      indent (to_string e2 level)
     | App(e, es) ->
         let es_str = String.concat ", " es in
         Printf.sprintf "%sAPP(%s [%s])" indent e es_str
