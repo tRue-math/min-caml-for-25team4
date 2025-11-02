@@ -9,7 +9,7 @@
 
 (copy_files
  (files x86/*)
- (enabled_if (or (= %{profile} x86) (= %{profile} dev) (= %{profile} release)))
+ (enabled_if (or (= %{profile} x86) (= %{profile} release)))
  (alias to_x86))
 
 (copy_files
@@ -19,7 +19,7 @@
 
 (copy_files
  (files myISA/*)
- (enabled_if (= %{profile} myISA))
+ (enabled_if (or (= %{profile} myISA) (= %{profile} dev)))
  (alias to_myISA))
 
 (env
