@@ -221,13 +221,13 @@ let print_expr oc (e : t) =
         Printf.sprintf "%sAPP(%s [%s])" indent e es_str
     | Tuple(es) ->
         let es_str = String.concat ", " es in
-        Printf.sprintf "%sTUPLE([%s])" indent es_str
+        Printf.sprintf "%sTUPLE(%s)" indent es_str
     | LetTuple(xts, e1, e2) ->
         let xts_str = String.concat ", " (List.map (fun (x, _) -> x) xts) in
-        Printf.sprintf "%s(LETTUPLE [%s] = %s in\n%s\n%s)"
-                      indent xts_str e1
-                      (to_string e2 nlev)
-                      indent
+        Printf.sprintf "%slet TUPLE(%s) =\n%s%s\n%sin\n%s"
+                      indent xts_str
+                      (make_indent nlev) e1
+                      indent (to_string e2 level)
     | Get(e1, e2) -> Printf.sprintf "%sGET(%s, %s)" indent e1 e2
     | Put(e1, e2, e3) -> Printf.sprintf "%sPUT(%s, %s, %s)" indent  e1 e2 e3
     | ExtArray(e1) -> Printf.sprintf "%sEXTARRAY %s" indent e1
