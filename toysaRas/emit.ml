@@ -247,18 +247,14 @@ let h oc { name = Id.L(x); args = _; fargs = _; body = {v=_;pos}as e; ret = _ } 
 
 let f oc (Prog(data, fundefs, e)) =
   Format.eprintf "generating assembly...@.";
+  stackset := S.empty;
+  stackmap := [];
+  g oc (NonTail(regs.(0)), e);
+  Printf.fprintf oc "\tjal\tx0, $0\n";
   List.iter
     (fun (Id.L(x), d) ->
       Printf.fprintf oc "%s:\t# %f\n" x d;
       Printf.fprintf oc "\t.long\t0x%lx\n" (gethi d);
       Printf.fprintf oc "\t.long\t0x%lx\n" (getlo d))
     data;
-  Printf.fprintf oc ".text\n";
   List.iter (fun fundef -> h oc fundef) fundefs;
-  Printf.fprintf oc ".globl\tmin_caml_start\n";
-  Printf.fprintf oc "min_caml_start:\n";
-  Printf.fprintf oc ".globl\t_min_caml_start\n";
-  Printf.fprintf oc "_min_caml_start: # for cygwin\n";
-  stackset := S.empty;
-  stackmap := [];
-  g oc (NonTail(regs.(0)), e);
