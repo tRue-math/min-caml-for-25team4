@@ -1,2 +1,0 @@
-#!/bin/zsh
-for f in asm.ml asm.mli emit.ml libmincaml.S regAlloc.ml simm.ml virtual.ml;do mv $f myISA/; done

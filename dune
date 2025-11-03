@@ -18,9 +18,9 @@
  (alias to_ppc))
 
 (copy_files
- (files myISA/*)
- (enabled_if (or (= %{profile} myISA) (= %{profile} dev)))
- (alias to_myISA))
+ (files toysaRas/*)
+ (enabled_if (or (= %{profile} toysaRas) (= %{profile} dev)))
+ (alias to_toysaRas))
 
 (env
  (dev
