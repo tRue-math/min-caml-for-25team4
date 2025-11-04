@@ -39,14 +39,19 @@ let rec shuffle sw xys =
                                          xys)
   | xys, acyc -> acyc @ shuffle sw xys
 
-let emit pos oc fmt =
-  let cont s =
-    Printf.fprintf oc "%s" s;
-    let padding_len = 32 - String.length s in
-    let padding = if padding_len > 0 then String.make padding_len ' ' else "\t" in
-    Printf.fprintf oc "%s# %d\n" padding pos.Lexing.pos_lnum
-  in
-  Printf.ksprintf cont fmt
+let imm x = "$" ^ string_of_int x
+
+let rec to_string_list = function
+  | h :: [] -> h
+  | h :: t -> h ^ ", " ^ to_string_list t
+  | [] -> ""
+
+let emit pos oc lis =
+  let s = to_string_list lis in
+  Printf.fprintf oc "%s" s;
+  let padding_len = 32 - String.length s in
+  let padding = if padding_len > 0 then String.make padding_len ' ' else "\t" in
+  Printf.fprintf oc "%s# %d\n" padding pos.Lexing.pos_lnum
 
 type dest = Tail | NonTail of Id.t (* 末尾かどうかを表すデータ型 (caml2html: emit_dest) *)
 let rec g oc (dest,({v=e;pos}:t)) = match dest,e with (* 命令列のアセンブリ生成 (caml2html: emit_g) *)
@@ -57,165 +62,165 @@ let rec g oc (dest,({v=e;pos}:t)) = match dest,e with (* 命令列のアセン�
 and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 (caml2html: emit_gprime) *)
   (* 末尾でなかったら計算結果をdestにセット (caml2html: emit_nontail) *)
   | NonTail(_), Nop -> ()
-  | NonTail(x), Set(i) -> emit pos oc "\taddi\t%s, x0, $%d" x i
-  | NonTail(x), SetL(Id.L(y)) -> emit pos oc "\taddi\t$%s, x0, $%s" x y
+  | NonTail(x), Set(i) -> emit pos oc ["\taddi";x;"x0";imm i]
+  | NonTail(x), SetL(Id.L(y)) -> emit pos oc ["\taddi";x;"x0";"$"^y]
   | NonTail(x), Mov(y) ->
-      if x <> y then emit pos oc "\taddi\t%s, %s, $0" x y
+      if x <> y then emit pos oc ["\taddi";x;y;"$0"]
   | NonTail(x), Neg(y) ->
-      if x <> y then emit pos oc "\tsub\t%s, x0, %s" x y;
+      if x <> y then emit pos oc ["\tsub";x;"x0";y]
   | NonTail(x), Add(y, z') ->
       (match z' with
-      | V(z) -> emit pos oc "\tadd\t%s, %s, %s" x y z
-      | C(i) -> emit pos oc "\taddi\t%s, %s, $%d" x y i)
+      | V(z) -> emit pos oc ["\tadd";x;y;z]
+      | C(i) -> emit pos oc ["\taddi";x;y;imm i])
   | NonTail(x), Sub(y, z') ->
       (match z' with
-      | V(z) -> emit pos oc "\tsub\t%s, %s, %s" x y z
-      | C(i) -> emit pos oc "\taddi\t%s, %s, $%d" x y (-i))
-  | NonTail(x), Ld(y, i) -> emit pos oc "\tlw\t%s, (%s,$%d)" x y i
-  | NonTail(_), St(x, y, i) -> emit pos oc "\tsw\t%s, (%s,$%d)" x y i
+      | V(z) -> emit pos oc ["\tsub";x;y;z]
+      | C(i) -> emit pos oc ["\taddi";x;y;imm (-i)])
+  | NonTail(x), Ld(y, i) -> emit pos oc ["\tlw";x;y;imm i]
+  | NonTail(_), St(x, y, i) -> emit pos oc ["\tsw";x;y;imm i]
   | NonTail(x), FMov(y) ->
-      if x <> y then emit pos oc "\tfsgnj\t%s,%s,%s" x y y
-  | NonTail(x), FNeg(y) -> emit pos oc "\tfsgnjn\t%s,%s,%s" x y y
-  | NonTail(x), FAdd(y, z) -> emit pos oc "\tfadd\t%s, %s, %s" x y z
-  | NonTail(x), FSub(y, z) -> emit pos oc "\tfsub\t%s, %s, %s" x y z
-  | NonTail(x), FMul(y, z) -> emit pos oc "\tfmul\t%s, %s, %s" x y z
-  | NonTail(x), FDiv(y, z) -> emit pos oc "\tfdiv\t%s, %s, %s" x y z
-  | NonTail(x), LdF(y, i) -> emit pos oc "\tflw\t%s, (%s,$%d)" x y i
-  | NonTail(_), StF(x, y, i) -> emit pos oc "\tfsw\t%s, (%s,$%d)" x y i
-  | NonTail(x), LdArray(y, z) -> emit pos oc "\tslli\t%s,%s,$2" reg_sw z;
-                              emit pos oc "\tadd\t%s,%s,%s" reg_sw y reg_sw;
-                              emit pos oc "\tlw\t%s, (%s,$0)" x reg_sw
-  | NonTail(_), StArray(x, y, z) -> emit pos oc "\tslli\t%s,%s,$2" reg_sw z;
-                              emit pos oc "\tadd\t%s,%s,%s" reg_sw y reg_sw;
-                              emit pos oc "\tsw\t%s, (%s,$0)" x reg_sw
-  | NonTail(x), LdFArray(y, z) -> emit pos oc "\tslli\t%s,%s,$2" reg_sw z;
-                              emit pos oc "\tadd\t%s,%s,%s" reg_sw y reg_sw;
-                              emit pos oc "\tflw\t%s, (%s,$0)" x reg_sw
-  | NonTail(_), StFArray(x, y, z) -> emit pos oc "\tslli\t%s,%s,$2" reg_sw z;
-                              emit pos oc "\tadd\t%s,%s,%s" reg_sw y reg_sw;
-                              emit pos oc "\tfsw\t%s, (%s,$0)" x reg_sw
-  | NonTail(_), Comment(s) -> emit pos oc "\t# %s" s
+      if x <> y then emit pos oc ["\tfsgnj";x;y;y]
+  | NonTail(x), FNeg(y) -> emit pos oc ["\tfsgnjn";x;y;y]
+  | NonTail(x), FAdd(y, z) -> emit pos oc ["\tfadd";x;y;z]
+  | NonTail(x), FSub(y, z) -> emit pos oc ["\tfsub";x;y;z]
+  | NonTail(x), FMul(y, z) -> emit pos oc ["\tfmul";x;y;z]
+  | NonTail(x), FDiv(y, z) -> emit pos oc ["\tfdiv";x;y;z]
+  | NonTail(x), LdF(y, i) -> emit pos oc ["\tflw\t";x;y;imm i]
+  | NonTail(_), StF(x, y, i) -> emit pos oc ["\tfsw";x;y;imm i]
+  | NonTail(x), LdArray(y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
+                              emit pos oc ["\tadd";reg_sw;y;reg_sw];
+                              emit pos oc ["\tlw";x;reg_sw;"$0"]
+  | NonTail(_), StArray(x, y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
+                              emit pos oc ["\tadd";reg_sw;y;reg_sw;];
+                              emit pos oc ["\tsw";x;reg_sw;"$0"]
+  | NonTail(x), LdFArray(y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
+                              emit pos oc ["\tadd";reg_sw;y;reg_sw];
+                              emit pos oc ["\tflw";x;reg_sw;"$0"]
+  | NonTail(_), StFArray(x, y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
+                              emit pos oc ["\tadd";reg_sw;y;reg_sw];
+                              emit pos oc ["\tfsw";x;reg_sw;"$0"]
+  | NonTail(_), Comment(s) -> emit pos oc ["\t# ";s]
   (* 退避の仮想命令の実装 (caml2html: emit_save) *)
   | NonTail(_), Save(x, y) when List.mem x allregs && not (S.mem y !stackset) ->
       save y;
-      emit pos oc "\tsw\t%s, (%s,$%d)" x reg_sp (offset y)
+      emit pos oc ["\tsw";x;reg_sp;imm (offset y)]
   | NonTail(_), Save(x, y) when List.mem x allfregs && not (S.mem y !stackset) ->
       savef y;
-      emit pos oc "\tfsw\t%s, (%s,$%d)" x reg_sp (offset y)
+      emit pos oc ["\tfsw";x;reg_sp;imm (offset y)]
   | NonTail(_), Save(x, y) -> assert (S.mem y !stackset); ()
   (* 復帰の仮想命令の実装 (caml2html: emit_restore) *)
   | NonTail(x), Restore(y) when List.mem x allregs ->
-      emit pos oc "\tlw\t%s, (%s, $%d)" x reg_sp (offset y) 
+      emit pos oc ["\tlw";x;reg_sp;imm (offset y)]
   | NonTail(x), Restore(y) ->
       assert (List.mem x allfregs);
-      emit pos oc "\tflw\t%s, (%s, $%d)" x reg_sp (offset y)
+      emit pos oc ["\tflw";x;reg_sp;imm (offset y)]
   (* 末尾だったら計算結果を第一レジスタにセットしてret (caml2html: emit_tailret) *)
   | Tail, (Nop | St _ | StF _ | StArray _ | StFArray _ | Comment _ | Save _ as exp) ->
       g' oc (NonTail(Id.gentmp Type.Unit), exp) pos;
-      emit pos oc "\tjal\tx0, %s" reg_ra;
+      emit pos oc ["\tjal";"x0";reg_ra];
   | Tail, (Set _ | SetL _ | Mov _ | Neg _ | Add _ | Sub _ | Ld _ | LdArray _ as exp) ->
       g' oc (NonTail(regs.(0)), exp) pos;
-      emit pos oc "\tjal\tx0, %s" reg_ra;
+      emit pos oc ["\tjal";"x0";reg_ra];
   | Tail, (FMov _ | FNeg _ | FAdd _ | FSub _ | FMul _ | FDiv _ | LdF _ | LdFArray _  as exp) ->
       g' oc (NonTail(fregs.(0)), exp) pos;
-      emit pos oc "\tjal\tx0, %s" reg_ra;
+      emit pos oc ["\tjal";"x0";reg_ra];
   | Tail, (Restore(x) as exp) ->
       (match locate x with
       | [i] -> g' oc (NonTail(regs.(0)), exp) pos
       | [i; j] when i + 1 = j -> g' oc (NonTail(fregs.(0)), exp) pos
       | _ -> assert false);
-      emit pos oc "\tjal\tx0, %s" reg_ra;
+      emit pos oc ["\tjal";"x0";reg_ra]
   | Tail, IfEq(x, V(y), e1, e2) ->
       g'_tail_if pos oc "beq" x y e1 e2
   | Tail, IfEq(x, C(y), e1, e2) ->
-      emit pos oc "\txori\t%s,%s,$%d" reg_sw x y;
+      emit pos oc ["\txori";reg_sw;x;imm y];
       g'_tail_if pos oc "beq" reg_sw "x0" e1 e2;
   | Tail, IfGE(x, V(y), e1, e2) ->
       g'_tail_if pos oc "bge" x y e1 e2
   | Tail, IfGE(x, C(y), e1, e2) ->
-      emit pos oc "\tslti\t%s,%s,$%d" reg_sw x y;
+      emit pos oc ["\tslti";reg_sw;x;imm y];
       g'_tail_if pos oc "beq" reg_sw "x0" e1 e2
   | Tail, IfLE(x, V(y), e1, e2) ->
       g'_tail_if pos oc "bge" y x e1 e2
   | Tail, IfLE(x, C(y), e1, e2) ->
-      emit pos oc "\taddi\t%s,%s,$%d" reg_sw x (-y);
+      emit pos oc ["\taddi";reg_sw;x;imm (-y)];
       g'_tail_if pos oc "bge" "x0" reg_sw e1 e2
   | Tail, IfFEq(x, y, e1, e2) ->
-      emit pos oc "\tfeq\t%s,%s,%s" reg_sw x y;
+      emit pos oc ["\tfeq";reg_sw;x;y];
       g'_tail_if pos oc "bne" reg_sw "x0" e1 e2
   | Tail, IfFLE(x, y, e1, e2) ->
-      emit pos oc "\tfle\t%s, %s, %s " reg_sw x y;
+      emit pos oc ["\tfle";reg_sw;x;y];
       g'_tail_if pos oc "bne" reg_sw "x0" e1 e2
   | NonTail(z), IfEq(x, V(y), e1, e2) ->
       g'_non_tail_if pos oc (NonTail(z)) e1 e2 "beq" x y
   | NonTail(z), IfEq(x, C(y), e1, e2) ->
-      emit pos oc "\txori\t%s,%s,$%d" reg_sw x y;
+      emit pos oc ["\txori";reg_sw;x;imm y];
       g'_non_tail_if pos oc (NonTail(z)) e1 e2 "beq" reg_sw "x0"
   | NonTail(z), IfGE(x, V(y), e1, e2) ->
       g'_non_tail_if pos oc (NonTail(z)) e1 e2 "bge" x y
   | NonTail(z), IfGE(x, C(y), e1, e2) ->
-      emit pos oc "\tslti\t%s,%s,$%d" reg_sw x y;
+      emit pos oc ["\tslti";reg_sw;x;imm y];
       g'_non_tail_if pos oc (NonTail(z)) e1 e2 "beq" reg_sw "x0"
   | NonTail(z), IfLE(x, V(y), e1, e2) ->
       g'_non_tail_if pos oc (NonTail(z)) e1 e2 "bge" y x
   | NonTail(z), IfLE(x, C(y), e1, e2) ->
-      emit pos oc "\taddi\t%s,%s,$%d" reg_sw x (-y);
+      emit pos oc ["\taddi";reg_sw;x;imm (-y)];
       g'_non_tail_if pos oc (NonTail(z)) e1 e2 "bge" "x0" reg_sw
   | NonTail(w), IfFEq(x, y, e1, e2) ->
-      emit pos oc "\tfeq\t%s, %s, %s " reg_sw x y;
+      emit pos oc ["\tfeq";reg_sw;x;y];
       g'_non_tail_if pos oc (NonTail(w)) e1 e2 "bne" reg_sw "x0"
   | NonTail(w), IfFLE(x, y, e1, e2) ->
-      emit pos oc "\tfle\t%s, %s, %s " reg_sw x y;
+      emit pos oc ["\tfle";reg_sw;x;y];
       g'_non_tail_if pos oc (NonTail(w)) e1 e2 "bne" reg_sw "x0"
   (* 関数呼び出しの仮想命令の実装 (caml2html: emit_call) *)
   | Tail, CallCls(x, ys, zs) -> (* 末尾呼び出し (caml2html: emit_tailcall) *)
       g'_args oc [(x, reg_cl)] ys zs pos;
-      emit pos oc "\tlw\t%s, (%s, $0)" reg_cl reg_cl;
-      emit pos oc "\tjalr\tx0, (%s,$0)" reg_cl;
+      emit pos oc ["\tlw";reg_cl;reg_cl;"$0"];
+      emit pos oc ["\tjalr";"x0";reg_cl;"$0"];
   | Tail, CallDir(Id.L(x), ys, zs) -> (* 末尾呼び出し *)
       g'_args oc [] ys zs pos;
-      emit pos oc "\tjal\tx0, $%s" x;
+      emit pos oc ["\tjal";"x0";"$"^x];
   | NonTail(a), CallCls(x, ys, zs) ->
       g'_args oc [(x, reg_cl)] ys zs pos;
       let ss = stacksize () in
-      if ss > 0 then emit pos oc "\taddi\t%s,x0,$%d" reg_sp ss;
-      emit pos oc "\tlw\t%s, (%s,$0)" reg_cl reg_cl;
-      emit pos oc "\tjalr\t%s, (%s,$0)" reg_ra reg_cl;
-      if ss > 0 then emit pos oc "\taddi\t%s,x0,$%d" reg_sp (-ss);
+      if ss > 0 then emit pos oc ["\taddi";reg_sp;reg_sp;imm ss];
+      emit pos oc ["\tlw";reg_cl;reg_cl;"$0"];
+      emit pos oc ["\tjalr";reg_ra;reg_cl;"$0"];
+      if ss > 0 then emit pos oc ["\taddi";reg_sp;reg_sp;imm (-ss)];
       if List.mem a allregs && a <> regs.(0) then
-        emit pos oc "\taddi\t%s,%s,$0" a regs.(0)
+        emit pos oc ["\taddi";a;regs.(0);"$0"]
       else if List.mem a allfregs && a <> fregs.(0) then
-        emit pos oc "\tfsgnj\t%s,%s,%s" a fregs.(0) fregs.(0)
+        emit pos oc ["\tfsgnj";a;fregs.(0);fregs.(0)]
   | NonTail(a), CallDir(Id.L(x), ys, zs) ->
       g'_args oc [] ys zs pos;
       let ss = stacksize () in
-      if ss > 0 then emit pos oc "\taddi\t%s,x0,$%d" reg_sp ss;
-      emit pos oc "\tjal\tx0, $%s" x;
-      if ss > 0 then emit pos oc "\taddi\t%s,x0,$%d" reg_sp (-ss);
+      if ss > 0 then emit pos oc ["\taddi";reg_sp;"x0";imm ss];
+      emit pos oc ["\tjal";reg_ra;"$"^x];
+      if ss > 0 then emit pos oc ["\taddi";reg_sp;"x0";imm (-ss)];
       if List.mem a allregs && a <> regs.(0) then
-        emit pos oc "\taddi\t%s,%s,$0" a regs.(0)
+        emit pos oc ["\taddi";a;regs.(0);"$0"]
       else if List.mem a allfregs && a <> fregs.(0) then
-        emit pos oc "\tfsgnj\t%s,%s,%s" a fregs.(0) fregs.(0)
+        emit pos oc ["\tfsgnj";a;fregs.(0);fregs.(0)]
 and g'_tail_if pos oc b_inst x y e1 e2 =
   let b_then = Id.genid (b_inst ^ "_then") in
-  emit pos oc "\t%s\t%s,%s,$%s" b_inst x y b_then;
+  emit pos oc ["\t"^b_inst;x;y;"$"^b_then];
   let stackset_back = !stackset in
   g oc (Tail, e2);
-  emit pos oc "%s:" b_then;
+  emit pos oc [b_then^":"];
   stackset := stackset_back;
   g oc (Tail, e1)
 and g'_non_tail_if pos oc dest e1 e2 b_inst x y =
   let b_then = Id.genid (b_inst ^ "_then") in
   let b_cont = Id.genid (b_inst ^"_cont") in
-  emit pos oc "\t%s\t%s, %s, $%s" b_inst x y b_then;
+  emit pos oc ["\t"^b_inst;x;y;"$"^b_then];
   let stackset_back = !stackset in
   g oc (dest, e2);
   let stackset1 = !stackset in
-  emit pos oc "\tjal\tx0,$%s" b_cont;
-  emit pos oc "%s:" b_then;
+  emit pos oc ["\tjal";"x0";"$"^b_cont];
+  emit pos oc [b_then^":"];
   stackset := stackset_back;
   g oc (dest, e1);
-  emit pos oc "%s:" b_cont;
+  emit pos oc [b_cont^":"];
   let stackset2 = !stackset in
   stackset := S.inter stackset1 stackset2
 and g'_args oc x_reg_cl ys zs pos =
@@ -228,7 +233,7 @@ and g'_args oc x_reg_cl ys zs pos =
       (0, x_reg_cl)
       ys in
   List.iter
-    (fun (y, r) -> emit pos oc "\taddi\t%s, %s, $0" r y)
+    (fun (y, r) -> emit pos oc ["\taddi";r;y;"$0"])
     (shuffle sw yrs);
   let (d, zfrs) =
     List.fold_left
@@ -236,11 +241,11 @@ and g'_args oc x_reg_cl ys zs pos =
       (0, [])
       zs in
   List.iter
-    (fun (z, fr) -> emit pos oc "\tfsgnj\t%s,%s,%s" fr z z)
+    (fun (z, fr) -> emit pos oc ["\tfsgnj";fr;z;z])
     (shuffle sw zfrs)
 
 let h oc { name = Id.L(x); args = _; fargs = _; body = {v=_;pos}as e; ret = _ } =
-  emit pos oc "%s:" x;
+  emit pos oc [x^":"];
   stackset := S.empty;
   stackmap := [];
   g oc (Tail, e)
@@ -250,7 +255,7 @@ let f oc (Prog(data, fundefs, e)) =
   stackset := S.empty;
   stackmap := [];
   g oc (NonTail(regs.(0)), e);
-  Printf.fprintf oc "\tjal\tx0, $0\n";
+  Printf.fprintf oc "\tjal\t,x0, $0\n";
   List.iter
     (fun (Id.L(x), d) ->
       Printf.fprintf oc "%s:\t# %f\n" x d;
