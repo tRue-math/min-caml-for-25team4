@@ -9,6 +9,7 @@ let rec pp_list = function
 let counter = ref 0
 let genid s =
   incr counter;
+  let s = match String.index_opt s '.' with Some i -> String.sub s 0 i | None -> s in
   Printf.sprintf "%s.%d" s !counter
 
 let rec id_of_typ = function
