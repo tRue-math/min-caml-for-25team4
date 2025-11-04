@@ -70,7 +70,8 @@ let rec fv_exp = function
   | Nop | Set(_) | SetL(_) | Comment(_) | Restore(_) -> []
   | Mov(x) | Neg(x) | Ld(x, _) | LdF(x, _) | FMov(x) | FNeg(x) | Save(x, _) -> [x]
   | Add(x, y') | Sub(x, y') -> x :: fv_id_or_imm y'
-  | FAdd(x, y) | FSub(x, y) | FMul(x, y) | FDiv(x, y) | St(x, y, _) | StF(x, y, _) -> [x; y]
+  | FAdd(x, y) | FSub(x, y) | FMul(x, y) | FDiv(x, y) | St(x, y, _) | StF(x, y, _) | LdArray(x,y) | LdFArray(x,y) -> [x; y]
+  | StArray(x, y, z) | StFArray(x, y, z) -> [x; y; z]
   | IfEq(x, y', e1, e2) | IfLE(x, y', e1, e2) | IfGE(x, y', e1, e2) -> x :: fv_id_or_imm y' @ remove_and_uniq S.empty (fv e1 @ fv e2) (* uniq here just for efficiency *)
   | IfFEq(x, y, e1, e2) | IfFLE(x, y, e1, e2) -> x :: y :: remove_and_uniq S.empty (fv e1 @ fv e2) (* uniq here just for efficiency *)
   | CallCls(x, ys, zs) -> x :: ys @ zs
