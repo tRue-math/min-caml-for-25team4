@@ -1,11 +1,16 @@
 let limit = ref 1000
 
-let rec iter n e = (* 最適化処理をくりかえす (caml2html: main_iter) *)
+let rec iter f n e = (* 最適化処理をくりかえす (caml2html: main_iter) *)
   Format.eprintf "iteration %d@." n;
   if n = 0 then e else
   let e' = Elim.f (ConstFold.f (Inline.f (Assoc.f (Beta.f e)))) in
+  let e'' = FlatTuple.f e' in
+  if e'' <> e' then
+    (Debug.print_debug (f ^ ".before_flatten") KNormal.print_expr e';
+    Debug.print_debug (f ^ ".after_flatten") KNormal.print_expr e'');
+  let e' = e'' in
   if e = e' then e else
-  iter (n - 1) e'
+  iter f (n - 1) e'
 
 let lexbuf f outchan l = (* バッファをコンパイルしてチャンネルへ出力する (caml2html: main_lexbuf) *)
   Id.counter := 0;
@@ -19,7 +24,7 @@ let lexbuf f outchan l = (* バッファをコンパイルしてチャンネル�
   Debug.print_debug (f ^ ".after_CSE") KNormal.print_expr cse;
   let alpha = Alpha.f knormal in
   Debug.print_debug (f ^ ".alpha") KNormal.print_expr alpha;
-  let optimized = iter !limit alpha in
+  let optimized = iter f !limit alpha in
   Debug.print_debug (f ^ ".optimized") KNormal.print_expr optimized;
   Emit.f outchan
     (RegAlloc.f
