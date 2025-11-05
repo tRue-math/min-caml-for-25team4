@@ -43,7 +43,7 @@ let imm x = "$" ^ string_of_int x
 
 let rec to_string_list = function
   | h :: [] -> h
-  | h :: t -> h ^ ", " ^ to_string_list t
+  | h :: t -> h ^ " " ^ to_string_list t
   | [] -> ""
 
 let emit pos oc lis =
