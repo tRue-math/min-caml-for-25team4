@@ -1,14 +1,22 @@
 open KNormal
 
-let rec flat_type = function
-  | Type.Tuple ts ->
-      List.flatten (List.map flat_type ts)
-  | t -> [t]
+let rec flat_type t =
+  match t with
+  | Type.Tuple ts -> Type.Tuple(List.concat_map unTuple ts)
+  | Type.Fun(args, ret) ->
+      Type.Fun(List.flatten (List.map unTuple args), flat_type ret)
+  | Type.Array t ->
+      Type.Array (flat_type t)
+  | t -> t
+and unTuple t =
+    (match flat_type t with
+    | Type.Tuple(tl) -> tl
+    | t->[t])
 
 let flat_xts =
   List.concat_map
   (fun (x,t) ->
-    let flat_t = flat_type t in
+    let flat_t = unTuple t in
     match flat_t with
     | [t] -> [(x,t)]
     | ts -> List.map (fun t -> (Id.genid x,t)) ts)
@@ -23,7 +31,7 @@ let rec reTuple xts flatten_xts set_pos g env e =
       | _::c',(x,_)::flatten_xts -> split c' flatten_xts (acc@[x])
       | _ -> failwith "spliterror"
     in
-    let flat_t = flat_type t in
+    let flat_t = unTuple t in
     let (head_flatten_xs,flatten_xts_rest) = split flat_t flatten_xts [] in
     if List.length head_flatten_xs = 1 then
       reTuple rest flatten_xts_rest set_pos g env e
@@ -45,26 +53,26 @@ let rec g env {v=e;pos} =
   | Let((x,t), {v=Tuple(ys);pos}, e2) ->
     let flat_ys =
       List.concat_map (fun y -> if M.mem y env then M.find y env else [y]) ys in
-    set_pos (Let((x,Type.Tuple(flat_type t)),
+    set_pos (Let((x,flat_type t),
             {v=Tuple(flat_ys);pos},
             g (M.add x flat_ys env) e2))
   | Let((x,(Type.Tuple(_)as t)), e1, e2) ->
-    let flat_t = flat_type t in
+    let flat_t = unTuple t in
     let xts' = List.map (fun t -> (Id.genid x,t)) flat_t in
     let xs' = List.map fst xts' in
-    set_pos (Let((x,Type.Tuple(flat_type t)),
+    set_pos (Let((x,flat_type t),
             g env e1,
             set_pos (LetTuple(xts', x,g (M.add x xs' env) e2))))
   | IfEq(x, y, e1, e2) -> set_pos (IfEq(x, y, g env e1, g env e2))
   | IfLE(x, y, e1, e2) -> set_pos (IfLE(x, y, g env e1, g env e2))
   | Let((x,t), e1, e2) ->
-    let t' = match t with Type.Tuple(_)as t -> Type.Tuple(flat_type t) | t -> t in
+    let t' = flat_type t in
     set_pos (Let((x,t'), g env e1, g env e2))
   | LetTuple(xts, y, e) ->
     let xts' = flat_xts xts in
     set_pos (LetTuple(xts', y, reTuple xts xts' set_pos g env e))
   | LetRec({ name = (x, t); args = yts; body = e1 }, e2) ->
-    let t' = match t with Type.Tuple(_)as t -> Type.Tuple(flat_type t) | t -> t in
+    let t' = flat_type t in
     let yts' = flat_xts yts in
     set_pos (LetRec({ name = (x, t'); args = yts';
     body = reTuple yts yts' set_pos g env e1}, g env e2))
