@@ -5,7 +5,7 @@ let rec find ({v=_;pos}as e) env =
 and 
   g env {v=e;pos} =
   let set_pos e = {v=e;pos} in
-  let find_with_check e env = if Effect.check e then e else find e env  in 
+  let find_with_check e env = if Effect.pure e then find e env else e in 
   match e with
   | Unit -> set_pos Unit
   | Int(i) -> set_pos (Int(i))
