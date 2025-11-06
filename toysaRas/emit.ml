@@ -194,9 +194,9 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
   | NonTail(a), CallDir(Id.L(x), ys, zs) ->
       g'_args oc [] ys zs pos;
       let ss = stacksize () in
-      if ss > 0 then emit pos oc ["\taddi";reg_sp;"x0";imm ss];
+      if ss > 0 then emit pos oc ["\taddi";reg_sp;reg_sp;imm ss];
       emit pos oc ["\tjal";reg_ra;"$"^x];
-      if ss > 0 then emit pos oc ["\taddi";reg_sp;"x0";imm (-ss)];
+      if ss > 0 then emit pos oc ["\taddi";reg_sp;reg_sp;imm (-ss)];
       if List.mem a allregs && a <> regs.(0) then
         emit pos oc ["\taddi";a;regs.(0);"$0"]
       else if List.mem a allfregs && a <> fregs.(0) then
