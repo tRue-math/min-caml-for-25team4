@@ -26,7 +26,6 @@ let expand xts ini addf addi =
     xts
     ini
     (fun (offset, acc) x ->
-      let offset = align offset in
       (offset + 4, addf x offset acc))
     (fun (offset, acc) x t ->
       (offset + 4, addi x t offset acc))
@@ -84,7 +83,7 @@ let rec g env ({v=e;pos}:Closure.t) = (* 式の仮想マシンコード生成 (c
           (fun y offset store_fv -> seq(StF(y, x, offset), store_fv))
           (fun y _ offset store_fv -> seq(St(y, x, offset), store_fv)) in
       set_pos (Let((x, t), Mov(reg_hp),
-          set_pos (Let((reg_hp, Type.Int), Add(reg_hp, C(align offset)),
+          set_pos (Let((reg_hp, Type.Int), Add(reg_hp, C(offset)),
               let z = Id.genid "l" in
               set_pos (Let((z, Type.Int), SetL(l),
                   seq(St(z, x, 0),
@@ -104,7 +103,7 @@ let rec g env ({v=e;pos}:Closure.t) = (* 式の仮想マシンコード生成 (c
           (fun x offset store -> seq(StF(x, y, offset), store))
           (fun x _ offset store -> seq(St(x, y, offset), store)) in
       set_pos (Let((y, Type.Tuple(List.map (fun x -> M.find x env) xs)), Mov(reg_hp),
-          set_pos (Let((reg_hp, Type.Int), Add(reg_hp, C(align offset)),
+          set_pos (Let((reg_hp, Type.Int), Add(reg_hp, C(offset)),
               store))))
   | Closure.LetTuple(xts, y, e2) ->
       let s = Closure.fv e2 in
