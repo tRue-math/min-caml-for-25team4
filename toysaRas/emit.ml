@@ -21,7 +21,7 @@ let locate x =
     | y :: zs when x = y -> 0 :: List.map succ (loc zs)
     | y :: zs -> List.map succ (loc zs) in
   loc !stackmap
-let offset x = 4 * List.hd (locate x)
+let offset x = -4 * (List.hd (locate x) + 1)
 let stacksize () = List.length !stackmap * 4
 
 (* 関数呼び出しのために引数を並べ替える(register shuffling) (caml2html: emit_shuffle) *)
@@ -183,12 +183,12 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
   | NonTail(a), CallCls(x, ys, zs) ->
       g'_args oc [(x, reg_cl)] ys zs pos;
       let ss = stacksize () in
-      emit pos oc ["\tsw";reg_ra;reg_sp;imm ss];
-      emit pos oc ["\taddi";reg_sp;reg_sp;imm (ss+4)];
+      emit pos oc ["\tsw";reg_ra;reg_sp;imm (-ss-4)];
+      emit pos oc ["\taddi";reg_sp;reg_sp;imm (-ss-4)];
       emit pos oc ["\tlw";reg_cl;reg_cl;"$0"];
       emit pos oc ["\tjalr";reg_ra;reg_cl;"$0"];
-      emit pos oc ["\taddi";reg_sp;reg_sp;imm (-ss-4)];
-      emit pos oc ["\tlw";reg_ra;reg_sp;imm ss];
+      emit pos oc ["\taddi";reg_sp;reg_sp;imm (ss+4)];
+      emit pos oc ["\tlw";reg_ra;reg_sp;imm (-ss-4)];
       if List.mem a allregs && a <> regs.(0) then
         emit pos oc ["\taddi";a;regs.(0);"$0"]
       else if List.mem a allfregs && a <> fregs.(0) then
@@ -196,11 +196,11 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
   | NonTail(a), CallDir(Id.L(x), ys, zs) ->
       g'_args oc [] ys zs pos;
       let ss = stacksize () in
-      emit pos oc ["\tsw";reg_ra;reg_sp;imm ss];
-      emit pos oc ["\taddi";reg_sp;reg_sp;imm (ss+4)];
-      emit pos oc ["\tjal";reg_ra;"$"^x];
+      emit pos oc ["\tsw";reg_ra;reg_sp;imm (-ss-4)];
       emit pos oc ["\taddi";reg_sp;reg_sp;imm (-ss-4)];
-      emit pos oc ["\tlw";reg_ra;reg_sp;imm ss];
+      emit pos oc ["\tjal";reg_ra;"$"^x];
+      emit pos oc ["\taddi";reg_sp;reg_sp;imm (ss+4)];
+      emit pos oc ["\tlw";reg_ra;reg_sp;imm (-ss-4)];
       if List.mem a allregs && a <> regs.(0) then
         emit pos oc ["\taddi";a;regs.(0);"$0"]
       else if List.mem a allfregs && a <> fregs.(0) then
