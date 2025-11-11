@@ -117,19 +117,19 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
   (* 末尾だったら計算結果を第一レジスタにセットしてret (caml2html: emit_tailret) *)
   | Tail, (Nop | St _ | StF _ | StArray _ | StFArray _ | Comment _ | Save _ as exp) ->
       g' oc (NonTail(Id.gentmp Type.Unit), exp) pos;
-      emit pos oc ["\tjal";"x0";reg_ra];
+      emit pos oc ["\tjalr";"x0";reg_ra;"$0"];
   | Tail, (Set _ | SetL _ | Mov _ | Neg _ | Add _ | Sub _ | Ld _ | LdArray _ as exp) ->
       g' oc (NonTail(regs.(0)), exp) pos;
-      emit pos oc ["\tjal";"x0";reg_ra];
+      emit pos oc ["\tjalr";"x0";reg_ra;"$0"];
   | Tail, (FMov _ | FNeg _ | FAdd _ | FSub _ | FMul _ | FDiv _ | LdF _ | LdFArray _  as exp) ->
       g' oc (NonTail(fregs.(0)), exp) pos;
-      emit pos oc ["\tjal";"x0";reg_ra];
+      emit pos oc ["\tjalr";"x0";reg_ra;"$0"];
   | Tail, (Restore(x) as exp) ->
       (match locate x with
       | [i] -> g' oc (NonTail(regs.(0)), exp) pos
       | [i; j] when i + 1 = j -> g' oc (NonTail(fregs.(0)), exp) pos
       | _ -> assert false);
-      emit pos oc ["\tjal";"x0";reg_ra]
+      emit pos oc ["\tjalr";"x0";reg_ra;"$0"]
   | Tail, IfEq(x, V(y), e1, e2) ->
       g'_tail_if pos oc "beq" x y e1 e2
   | Tail, IfEq(x, C(y), e1, e2) ->
@@ -255,7 +255,7 @@ let f oc (Prog(data, fundefs, e)) =
   stackset := S.empty;
   stackmap := [];
   g oc (NonTail(regs.(0)), e);
-  Printf.fprintf oc "\tjal\t,x0, $0\n";
+  Printf.fprintf oc "\tjal x0 $0\n";
   List.iter
     (fun (Id.L(x), d) ->
       Printf.fprintf oc "%s:\t# %f\n" x d;
