@@ -175,8 +175,8 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
   (* 関数呼び出しの仮想命令の実装 (caml2html: emit_call) *)
   | Tail, CallCls(x, ys, zs) -> (* 末尾呼び出し (caml2html: emit_tailcall) *)
       g'_args oc [(x, reg_cl)] ys zs pos;
-      emit pos oc ["\tlw";reg_cl;reg_cl;"$0"];
-      emit pos oc ["\tjalr";"x0";reg_cl;"$0"];
+      emit pos oc ["\tlw";reg_sw;reg_cl;"$0"];
+      emit pos oc ["\tjalr";"x0";reg_sw;"$0"];
   | Tail, CallDir(Id.L(x), ys, zs) -> (* 末尾呼び出し *)
       g'_args oc [] ys zs pos;
       emit pos oc ["\tjal";"x0";"$"^x];
