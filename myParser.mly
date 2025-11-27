@@ -28,12 +28,14 @@ let at_pos node = { v = node; pos = Parsing.symbol_start_pos () }
 %token ELSE
 %token <Id.t> IDENT
 %token LET
+%token FUN
 %token IN
 %token REC
 %token COMMA
 %token ARRAY_CREATE
 %token DOT
 %token LESS_MINUS
+%token MINUS_GREATER
 %token SEMICOLON
 %token LPAREN
 %token RPAREN
@@ -45,6 +47,7 @@ let at_pos node = { v = node; pos = Parsing.symbol_start_pos () }
 %right SEMICOLON
 %right prec_if
 %right LESS_MINUS
+%nonassoc MINUS_GREATER
 %nonassoc prec_tuple
 %left COMMA
 %left EQUAL LESS_GREATER LESS GREATER LESS_EQUAL GREATER_EQUAL
@@ -124,6 +127,12 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 | LET REC fundef IN exp
     %prec prec_let
     { at_pos (LetRec($3, $5)) }
+| FUN formal_args MINUS_GREATER exp
+    %prec prec_let
+    {
+      let f = Id.gentmp Type.Unit in
+      at_pos (LetRec({ name = addtyp f; args = $2; body = $4 }, at_pos (Var(f))))
+    }
 | simple_exp actual_args
     %prec prec_app
     { at_pos (App($1, $2)) }

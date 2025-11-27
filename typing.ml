@@ -11,6 +11,14 @@ let type_error_with_pos pos =
 
 let extenv = ref M.empty
 
+let innerenv = ref M.empty
+
+let rec split n lis =
+  if n <= 0 then ([], lis)
+  else match lis with
+    | [] -> ([], [])
+    | x::xs -> let (ys, zs) = split (n - 1) xs in (x::ys, zs)
+
 (* for pretty printing (and type normalization) *)
 let rec deref_typ = function (* 型変数を中身でおきかえる関数 (caml2html: typing_deref) *)
   | Type.Fun(t1s, t2) -> Type.Fun(List.map deref_typ t1s, deref_typ t2)
@@ -26,33 +34,6 @@ let rec deref_typ = function (* 型変数を中身でおきかえる関数 (caml
       t'
   | t -> t
 let deref_id_typ (x, t) = (x, deref_typ t)
-let rec deref_term {v=e;pos} = 
-    let set_pos e = { v = e; pos } in match e with
-  | Not(e) -> set_pos (Not(deref_term e))
-  | Neg(e) -> set_pos (Neg(deref_term e))
-  | Add(e1, e2) -> set_pos (Add(deref_term e1, deref_term e2))
-  | Sub(e1, e2) -> set_pos (Sub(deref_term e1, deref_term e2))
-  | Eq(e1, e2) -> set_pos (Eq(deref_term e1, deref_term e2))
-  | LE(e1, e2) -> set_pos (LE(deref_term e1, deref_term e2))
-  | FNeg(e) -> set_pos (FNeg(deref_term e))
-  | FAdd(e1, e2) -> set_pos (FAdd(deref_term e1, deref_term e2))
-  | FSub(e1, e2) -> set_pos (FSub(deref_term e1, deref_term e2))
-  | FMul(e1, e2) -> set_pos (FMul(deref_term e1, deref_term e2))
-  | FDiv(e1, e2) -> set_pos (FDiv(deref_term e1, deref_term e2))
-  | If(e1, e2, e3) -> set_pos (If(deref_term e1, deref_term e2, deref_term e3))
-  | Let(xt, e1, e2) -> set_pos (Let(deref_id_typ xt, deref_term e1, deref_term e2))
-  | LetRec({ name = xt; args = yts; body = e1 }, e2) ->
-      set_pos (LetRec({ name = deref_id_typ xt;
-               args = List.map deref_id_typ yts;
-               body = deref_term e1 },
-             deref_term e2))
-  | App(e, es) -> set_pos (App(deref_term e, List.map deref_term es))
-  | Tuple(es) -> set_pos (Tuple(List.map deref_term es))
-  | LetTuple(xts, e1, e2) -> set_pos (LetTuple(List.map deref_id_typ xts, deref_term e1, deref_term e2))
-  | Array(e1, e2) -> set_pos (Array(deref_term e1, deref_term e2))
-  | Get(e1, e2) -> set_pos (Get(deref_term e1, deref_term e2))
-  | Put(e1, e2, e3) -> set_pos (Put(deref_term e1, deref_term e2, deref_term e3))
-  | e -> set_pos e
 
 let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
   | Type.Fun(t2s, t2) -> List.exists (occur r1) t2s || occur r1 t2
@@ -67,9 +48,16 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする 
   match t1, t2 with
   | Type.Unit, Type.Unit | Type.Bool, Type.Bool | Type.Int, Type.Int | Type.Float, Type.Float -> ()
   | Type.Fun(t1s, t1'), Type.Fun(t2s, t2') ->
-      (try List.iter2 unify t1s t2s
+    if List.length t1s = List.length t2s then
+      ((try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)));
-      unify t1' t2'
+      unify t1' t2')
+    else if List.length t1s < List.length t2s then
+      (let (t2s1, t2s2) = split (List.length t1s) t2s in
+      (try List.iter2 unify t1s t2s1
+      with Invalid_argument(_) -> raise (Unify(t1, t2)));
+      unify t1' (Type.Fun(t2s2, t2')))
+    else unify t2 t1
   | Type.Tuple(t1s), Type.Tuple(t2s) ->
       (try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)))
@@ -115,6 +103,7 @@ let rec g env {v=e;pos} = (* 型推論ルーチン (caml2html: typing_g) *)
       t2
   | Let((x, t), e1, e2) -> (* letの型推論 (caml2html: typing_let) *)
       unify_with_pos t (g env e1) pos;
+      innerenv := M.add x t !innerenv;
       g (M.add x t env) e2
   | Var(x) when M.mem x env -> M.find x env (* 変数の型推論 (caml2html: typing_var) *)
   | Var(x) when M.mem x !extenv -> M.find x !extenv
@@ -125,6 +114,7 @@ let rec g env {v=e;pos} = (* 型推論ルーチン (caml2html: typing_g) *)
       t
   | LetRec({ name = (x, t); args = yts; body = e1 }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
       let env = M.add x t env in
+      innerenv := M.add x t !innerenv;
       unify_with_pos t (Type.Fun(List.map snd yts, g (M.add_list yts env) e1)) pos;
       g env e2
   | App(e, es) -> (* 関数適用の型推論 (caml2html: typing_app) *)
@@ -134,6 +124,7 @@ let rec g env {v=e;pos} = (* 型推論ルーチン (caml2html: typing_g) *)
   | Tuple(es) -> Type.Tuple(List.map (g env) es)
   | LetTuple(xts, e1, e2) ->
       unify_with_pos (Type.Tuple(List.map snd xts)) (g env e1) pos;
+      innerenv := M.add_list xts !innerenv;
       g (M.add_list xts env) e2
   | Array(e1, e2) -> (* must be a primitive for "polymorphic" typing *)
       unify_with_pos Type.Int (g env e1) pos;
@@ -149,6 +140,50 @@ let rec g env {v=e;pos} = (* 型推論ルーチン (caml2html: typing_g) *)
       unify_with_pos Type.Int (g env e2) pos;
       Type.Unit
 
+let rec deref_term {v=e;pos} = 
+    let set_pos e = { v = e; pos } in match e with
+  | Not(e) -> set_pos (Not(deref_term e))
+  | Neg(e) -> set_pos (Neg(deref_term e))
+  | Add(e1, e2) -> set_pos (Add(deref_term e1, deref_term e2))
+  | Sub(e1, e2) -> set_pos (Sub(deref_term e1, deref_term e2))
+  | Eq(e1, e2) -> set_pos (Eq(deref_term e1, deref_term e2))
+  | LE(e1, e2) -> set_pos (LE(deref_term e1, deref_term e2))
+  | FNeg(e) -> set_pos (FNeg(deref_term e))
+  | FAdd(e1, e2) -> set_pos (FAdd(deref_term e1, deref_term e2))
+  | FSub(e1, e2) -> set_pos (FSub(deref_term e1, deref_term e2))
+  | FMul(e1, e2) -> set_pos (FMul(deref_term e1, deref_term e2))
+  | FDiv(e1, e2) -> set_pos (FDiv(deref_term e1, deref_term e2))
+  | If(e1, e2, e3) -> set_pos (If(deref_term e1, deref_term e2, deref_term e3))
+  | Let(xt, e1, e2) -> set_pos (Let(deref_id_typ xt, deref_term e1, deref_term e2))
+  | LetRec({ name = xt; args = yts; body = e1 }, e2) ->
+      set_pos (LetRec({ name = deref_id_typ xt;
+               args = List.map deref_id_typ yts;
+               body = deref_term e1 },
+             deref_term e2))
+  | App(e, es) -> 
+    let e,es = deref_term e, List.map deref_term es in
+    let type_of_e = g !innerenv e in
+    let (type_args,type_ret) = match type_of_e with
+      | Type.Fun(args, ret) -> (args, ret)
+      | _ -> raise (Unify(type_of_e, Type.Unit)) in
+    let len_to_apply = List.length es in
+    if len_to_apply < List.length type_args then
+      (let (t_apply,t_remains) = split len_to_apply type_args in
+      let funname = Id.genid "tmpfun" in
+      let args_name = List.map (fun _ -> Id.genid "arg") t_remains in
+      let args_remain = List.map (fun name -> set_pos (Var(name))) args_name in
+      set_pos (LetRec({name=(funname, Type.Fun(t_apply, Type.Fun(t_remains, type_ret)));
+                       args = List.map2 (fun x y -> (x,y)) args_name t_remains;
+                       body = set_pos (App(e, es@args_remain))},
+                     set_pos (Var(funname)))))
+    else set_pos (App(e, es))
+  | Tuple(es) -> set_pos (Tuple(List.map deref_term es))
+  | LetTuple(xts, e1, e2) -> set_pos (LetTuple(List.map deref_id_typ xts, deref_term e1, deref_term e2))
+  | Array(e1, e2) -> set_pos (Array(deref_term e1, deref_term e2))
+  | Get(e1, e2) -> set_pos (Get(deref_term e1, deref_term e2))
+  | Put(e1, e2, e3) -> set_pos (Put(deref_term e1, deref_term e2, deref_term e3))
+  | e -> set_pos e
+
 let f e =
   extenv := M.empty;
 (*
@@ -158,5 +193,6 @@ let f e =
 *)
   (try unify Type.Unit (g M.empty e)
   with Unify _ -> failwith "top level does not have type unit");
+  innerenv := M.map deref_typ !innerenv;
   extenv := M.map deref_typ !extenv;
   deref_term e

@@ -66,6 +66,8 @@ rule token = parse
     { ELSE }
 | "let"
     { LET }
+| "fun"
+    { FUN }
 | "in"
     { IN }
 | "rec"
@@ -80,6 +82,8 @@ rule token = parse
     { DOT }
 | "<-"
     { LESS_MINUS }
+| "->"
+    { MINUS_GREATER }
 | ';'
     { SEMICOLON }
 | eof
