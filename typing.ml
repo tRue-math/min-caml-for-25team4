@@ -116,6 +116,7 @@ let rec g env {v=e;pos} = (* 型推論ルーチン (caml2html: typing_g) *)
       let env = M.add x t env in
       innerenv := M.add x t !innerenv;
       unify_with_pos t (Type.Fun(List.map snd yts, g (M.add_list yts env) e1)) pos;
+      innerenv := M.add_list yts !innerenv;
       g env e2
   | App(e, es) -> (* 関数適用の型推論 (caml2html: typing_app) *)
       let t = Type.gentyp () in
@@ -164,8 +165,10 @@ let rec deref_term {v=e;pos} =
     let e,es = deref_term e, List.map deref_term es in
     let type_of_e = g !innerenv e in
     let (type_args,type_ret) = match type_of_e with
-      | Type.Fun(args, ret) -> (args, ret)
-      | _ -> raise (Unify(type_of_e, Type.Unit)) in
+      | Var({contents=Some(Type.Fun(args, ret))}) | Type.Fun(args, ret) -> (args, ret)
+      | _ -> 
+        (* Format.eprintf "%s" (Type.to_string type_of_e); *)
+        raise (Unify(type_of_e, Type.Unit)) in
     let len_to_apply = List.length es in
     if len_to_apply < List.length type_args then
       (let (t_apply,t_remains) = split len_to_apply type_args in
@@ -195,4 +198,6 @@ let f e =
   with Unify _ -> failwith "top level does not have type unit");
   innerenv := M.map deref_typ !innerenv;
   extenv := M.map deref_typ !extenv;
+  (* (List.iter (fun (x, t) -> Format.eprintf "internal %s : %s@." x (Type.to_string t)) (M.bindings !innerenv));
+  (List.iter (fun (x, t) -> Format.eprintf "external %s : %s@." x (Type.to_string t)) (M.bindings !extenv)); *)
   deref_term e
