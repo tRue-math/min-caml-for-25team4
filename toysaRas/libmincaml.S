@@ -51,3 +51,9 @@ inner_div:
 	bge	%x02 x0 $inner_div
 	add	%x02 %x02 %x03
 	jalr x0 %x04 $0
+min_caml_read_int:
+	lw	%x01 x0 $-1
+	jalr	x0 %ra $0
+min_caml_read_float:
+	flw	%f00 x0 $-1
+	jalr	x0 %ra $0
