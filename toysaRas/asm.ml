@@ -47,7 +47,7 @@ let fletd(x, e1, {v=e2;pos}) = {v=Let((x, Type.Float), e1, {v=e2;pos});pos}
 let seq(e1, {v=e2;pos}) = {v=Let((Id.gentmp Type.Unit, Type.Unit), e1, {v=e2;pos});pos}
 
 let regs = Array.init 16 (fun i -> Printf.sprintf "%%x%02d" (i+1))
-let fregs = Array.init 32 (fun i -> Printf.sprintf "%%xmm%02d" i)
+let fregs = Array.init 32 (fun i -> Printf.sprintf "%%f%02d" i)
 let allregs = Array.to_list regs
 let allfregs = Array.to_list fregs
 let reg_cl = "%rcp" (* closure address (caml2html: sparcasm_regcl) *)
