@@ -31,6 +31,7 @@ let lexbuf f outchan l = (* バッファをコンパイルしてチャンネル�
 let string s = lexbuf "tmp" stdout (Lexing.from_string s) (* 文字列をコンパイルして標準出力に表示する (caml2html: main_string) *)
 
 let file f = (* ファイルをコンパイルしてファイルに出力する (caml2html: main_file) *)
+	let f = if Filename.check_suffix f ".ml" then Filename.chop_suffix f ".ml" else f in
   let inchan = open_in (f ^ ".ml") in
   let outchan = open_out (f ^ ".s") in
   try
