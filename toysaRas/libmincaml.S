@@ -10,7 +10,6 @@ create_array_loop:
     jal	x0 $create_array_loop
 create_array_exit:
     jalr	x0 %ra $0
-
 min_caml_create_float_array:
     slli    %x02 %x01 $2
     add	%rhp %rhp %x02
