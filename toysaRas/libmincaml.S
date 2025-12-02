@@ -57,3 +57,15 @@ min_caml_read_int:
 min_caml_read_float:
 	flw	%f00 x0 $-1
 	jalr	x0 %ra $0
+min_caml_abs_float:
+	fsub	%f01 %f01 %f01
+	fle	%f01 %f00 $abs_float_exit
+	fsgnjn	%f00 %f00 %f00
+abs_float_exit:
+	jalr	x0 %ra $0
+min_caml_float_of_int:
+	fcvt.s.w	%f00 %x01
+	jalr	x0 %ra $0
+min_caml_int_of_float:
+	fcvt.w.s	%x01 %f00
+	jalr	x0 %ra $0
