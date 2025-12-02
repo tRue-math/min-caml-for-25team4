@@ -3,7 +3,7 @@ let limit = ref 1000
 let rec iter f n e = (* 最適化処理をくりかえす (caml2html: main_iter) *)
   Format.eprintf "iteration %d@." n;
   if n = 0 then e else
-  let e' = Elim.f (ConstFold.f (Inline.f (Assoc.f (Beta.f e)))) in
+  let e' = Cse.f (Elim.f (ConstFold.f (Inline.f (Assoc.f (Beta.f e))))) in
   if e = e' then e else
   iter f (n - 1) e'
 
@@ -14,9 +14,6 @@ let lexbuf f outchan l = (* バッファをコンパイルしてチャンネル�
   Debug.print_debug (f ^ ".parsed") Syntax.print_expr parsed;
   let knormal = KNormal.f (Typing.f parsed) in
   Debug.print_debug (f ^ ".knormal") KNormal.print_expr knormal;
-  Debug.print_debug (f ^ ".before_CSE") KNormal.print_expr knormal;
-  let cse = Cse.f knormal in
-  Debug.print_debug (f ^ ".after_CSE") KNormal.print_expr cse;
   let alpha = Alpha.f knormal in
   Debug.print_debug (f ^ ".alpha") KNormal.print_expr alpha;
   let assoced = Assoc.f (Beta.f alpha) in
