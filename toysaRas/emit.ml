@@ -260,9 +260,9 @@ let f oc (Prog(data, fundefs, e)) =
   List.iter
     (fun (Id.L(x), d) ->
       Printf.fprintf oc "%s:\t# %f\n" x d;
-      Printf.fprintf oc "\t.data\t%d\n" (Int32.to_int (Int32.bits_of_float d))
-      (* Printf.fprintf oc "\t.long\t0x%lx\n" (gethi d);
-      Printf.fprintf oc "\t.long\t0x%lx\n" (getlo d) *)
-      )
+      let u = Int32.unsigned_to_int (Int32.bits_of_float d) in
+      match u with
+      | None -> ()
+      | Some u -> Printf.fprintf oc "\t.data\t%u\n" u)
     data;
   List.iter (fun fundef -> h oc fundef) fundefs;
