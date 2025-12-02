@@ -1,14 +1,12 @@
 min_caml_create_array:
-    addi	%x03 %x01 $0
-    addi	%x01 %rhp $0
-    slli	%x04 %x03 $2
-    add	%rhp %rhp %x04
+    slli    %x03 %x01 $2
+    add	%rhp %rhp %x03
+    addi	%x01 %rhp %x03
 create_array_loop:
     beq	%x03 x0 $create_array_exit
-    addi	%x03 %x03 $-1
-    slli	%x04 %x03 $2
-    add	%x04 %x01 %x04
-    sw	%x02 %x04 $0
+    addi	%x03 %x03 $-4
+    addi    %x01 %x01 $-4
+    sw	%x02 %x01 $0
     jal	x0 $create_array_loop
 create_array_exit:
     jalr	x0 %ra $0
