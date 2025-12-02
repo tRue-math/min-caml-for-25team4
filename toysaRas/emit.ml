@@ -90,18 +90,18 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
   | NonTail(x), LdArray(y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
                               emit pos oc ["\tadd";reg_sw;y;reg_sw];
                               emit pos oc ["\tlw";x;reg_sw;"$0"]
-  | NonTail(_), StArray(x, y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
-                              emit pos oc ["\tadd";reg_sw;y;reg_sw;];
-                              emit pos oc ["\tsw";x;reg_sw;"$0"]
+  | NonTail(_), StArray(x, y, z) -> emit pos oc ["\tslli";reg_sw;y;"$2"];
+                              emit pos oc ["\tadd";reg_sw;x;reg_sw;];
+                              emit pos oc ["\tsw";z;reg_sw;"$0"]
   | NonTail(x), LdFArray(y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
                               emit pos oc ["\tadd";reg_sw;y;reg_sw];
                               emit pos oc ["\tflw";x;reg_sw;"$0"]
-  | NonTail(_), StFArray(x, y, z) -> emit pos oc ["\tslli";reg_sw;z;"$2"];
-                              emit pos oc ["\tadd";reg_sw;y;reg_sw];
-                              emit pos oc ["\tfsw";x;reg_sw;"$0"]
+  | NonTail(_), StFArray(x, y, z) -> emit pos oc ["\tslli";reg_sw;y;"$2"];
+                              emit pos oc ["\tadd";reg_sw;x;reg_sw];
+                              emit pos oc ["\tfsw";z;reg_sw;"$0"]
   | NonTail(_), Comment(s) -> emit pos oc ["\t# ";s]
   (* 退避の仮想命令の実装 (caml2html: emit_save) *)
-  | NonTail(_), Save(x, y) when List.mem x allregs && not (S.mem y !stackset) ->
+  | NonTail(_), Save(x, y) when List.mem x (reg_cl :: allregs) && not (S.mem y !stackset) ->
       save y;
       emit pos oc ["\tsw";x;reg_sp;imm (offset y)]
   | NonTail(_), Save(x, y) when List.mem x allfregs && not (S.mem y !stackset) ->
@@ -109,7 +109,7 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
       emit pos oc ["\tfsw";x;reg_sp;imm (offset y)]
   | NonTail(_), Save(x, y) -> assert (S.mem y !stackset); ()
   (* 復帰の仮想命令の実装 (caml2html: emit_restore) *)
-  | NonTail(x), Restore(y) when List.mem x allregs ->
+  | NonTail(x), Restore(y) when List.mem x (reg_cl :: allregs) ->
       emit pos oc ["\tlw";x;reg_sp;imm (offset y)]
   | NonTail(x), Restore(y) ->
       assert (List.mem x allfregs);
@@ -185,8 +185,8 @@ and g' oc (dest,e) pos = match dest,e with (* 各命令のアセンブリ生成 
       let ss = stacksize () in
       emit pos oc ["\tsw";reg_ra;reg_sp;imm (-ss-4)];
       emit pos oc ["\taddi";reg_sp;reg_sp;imm (-ss-4)];
-      emit pos oc ["\tlw";reg_cl;reg_cl;"$0"];
-      emit pos oc ["\tjalr";reg_ra;reg_cl;"$0"];
+      emit pos oc ["\tlw";reg_sw;reg_cl;"$0"];
+      emit pos oc ["\tjalr";reg_ra;reg_sw;"$0"];
       emit pos oc ["\taddi";reg_sp;reg_sp;imm (ss+4)];
       emit pos oc ["\tlw";reg_ra;reg_sp;imm (-ss-4)];
       if List.mem a allregs && a <> regs.(0) then
