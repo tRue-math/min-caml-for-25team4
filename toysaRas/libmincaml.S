@@ -106,6 +106,35 @@ fdiv_loop_then:
 	fsub	%f05 %f04 %f05
 	fmul	%f00 %f00 %f05
 	jal	x0 $fdiv_loop
+min_caml_sqrt:
+	addi	%x02 %ra $0
+	flw	%f01 x0 $delta
+	fmul	%f07 %f00 %f01
+	flw	%f02 x0 $epsilon
+	fle	%tmp %f02 %f07
+	bne	%tmp x0 $sqrt_cont
+	fsgnj	%f07 %f02 %f02
+sqrt_cont:
+	fsgnj	%f06 %f00 %f00
+	fsqrt	%f00 %f00
+sqrt_loop:
+	fmul	%f03 %f00 %f00
+	fle	%tmp %f03 %f06
+	fsub	%f03 %f06 %f03
+	bne %tmp x0 $sqrt_loop_cont
+	fsgnjn	%f03 %f03 %f03
+sqrt_loop_cont:
+	fle	%tmp %f07 %f03
+	bne	%tmp x0 $sqrt_loop_then
+	jalr	x0 %x02 $0
+sqrt_loop_then:
+	fsgnj	%f01 %f00 %f00
+	fsgnj	%f00 %f06 %f06
+	jal	%ra $min_caml_fdiv
+	fadd	%f00 %f00 %f01
+	flw	%f01 x0 $two
+	jal	%ra $min_caml_fdiv
+	jal	x0 $sqrt_loop
 delta: # 2^(-20)
 	.data	897581056
 epsilon: # 2^(-126)
