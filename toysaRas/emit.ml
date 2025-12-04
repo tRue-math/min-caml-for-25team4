@@ -266,3 +266,12 @@ let f oc (Prog(data, fundefs, e)) =
       | Some u -> Printf.fprintf oc "\t.data\t%u\n" u)
     data;
   List.iter (fun fundef -> h oc fundef) fundefs;
+  (* libmincaml.Sをそのまま末尾にくっつけて出力 *)
+  let libmincaml = open_in "toysaRas/libmincaml.S" in
+  try
+    while true do
+      let line = input_line libmincaml in
+      Printf.fprintf oc "%s\n" line
+    done
+  with End_of_file ->
+    close_in libmincaml;
