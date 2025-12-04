@@ -69,3 +69,39 @@ min_caml_float_of_int:
 min_caml_int_of_float:
 	fcvt.w.s	%x01 %f00
 	jalr	x0 %ra $0
+fdiv_loop:
+	fmul	%f04 %f00 %f01
+	fmul	%f04 %f04 %f03
+	fle	%tmp %f04 %f03
+	fsub	%f04 %f03 %f04
+	bne	%tmp x0 $fdiv_loop_cont
+	fsgnjn	%f04 %f04 %f04
+fdiv_loop_cont:
+	fle %tmp %f02 %f04
+	bne %tmp x0 $fdiv_loop_then
+	fmul	%f00 %f00 %f03
+	jalr x0 %ra $0
+fdiv_loop_then:
+	flw	%f04 x0 $div.l3
+	fmul	%f05 %f00 %f01
+	fsub	%f05 %f04 %f05
+	fmul	%f00 %f00 %f05
+	jal	x0 $fdiv_loop
+min_caml_fdiv:
+	flw	 %f02 x0 $div.l2
+	fmul %f02 %f00 %f02
+	flw	 %f03 x0 $div.l1
+	fmul %f03 %f01 %f03
+	fle %tmp %f02 %f03
+	bne %tmp x0 $fdiv_cont
+	fsgnj %f02 %f03 %f03
+fdiv_cont:
+	fsgnj %f03 %f00 %f00
+	finv %f00 %f01
+	jal x0 $fdiv_loop
+div.l1:	# 2^(-126)
+	.data	8388608
+div.l2:	# 2^(-20)
+	.data	897581056
+div.l3:	# 2.000000
+	.data	1073741824

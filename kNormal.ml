@@ -88,7 +88,7 @@ let rec g env ({v=e;pos}: Syntax.t) =
   | Syntax.FDiv(e1, e2) ->
       insert_let (g env e1)
         (fun x -> insert_let (g env e2)
-            (fun y -> set_pos (FDiv(x, y)), Type.Float))
+            (fun y -> set_pos (ExtFunApp("fdiv", [x; y])), Type.Float))
   | Syntax.Eq (_,_) | Syntax.LE (_,_) as cmp ->
       g env {v=Syntax.If({v=cmp;pos}, {v=Syntax.Bool(true);pos}, {v=Syntax.Bool(false);pos});pos}
   | Syntax.If({v=Syntax.Not(e1);_}, e2, e3) -> g env {v=Syntax.If(e1, e3, e2);pos} (* notによる分岐を変換 (caml2html: knormal_not) *)
