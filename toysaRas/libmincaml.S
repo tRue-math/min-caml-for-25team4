@@ -80,6 +80,9 @@ fdiv_loop_cont:
 	fle %tmp %f02 %f04
 	bne %tmp x0 $fdiv_loop_then
 	fmul	%f00 %f00 %f03
+	beq	%x01 x0 $fdiv_exit
+	fsgnjn	%f00 %f00 %f00
+fdiv_exit:
 	jalr x0 %ra $0
 fdiv_loop_then:
 	flw	%f04 x0 $div.l3
@@ -88,12 +91,17 @@ fdiv_loop_then:
 	fmul	%f00 %f00 %f05
 	jal	x0 $fdiv_loop
 min_caml_fdiv:
-	flw	 %f02 x0 $div.l2
-	fmul %f02 %f00 %f02
-	flw	 %f03 x0 $div.l1
-	fmul %f03 %f01 %f03
-	fle %tmp %f02 %f03
-	bne %tmp x0 $fdiv_cont
+	fsub	%f02 %f02 %f02
+	flt	%x01 %f00 %f02
+	beq	%x01 x0 $fdiv_set_upped
+	fsgnjn	%f00 %f00 %f00
+fdiv_set_upped:
+	flw	%f02 x0 $div.l2
+	fmul	%f02 %f00 %f02
+	flw	%f03 x0 $div.l1
+	fmul	%f03 %f01 %f03
+	fle	%tmp %f03 %f02
+	bne	%tmp x0 $fdiv_cont
 	fsgnj %f02 %f03 %f03
 fdiv_cont:
 	fsgnj %f03 %f00 %f00
